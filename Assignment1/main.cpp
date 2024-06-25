@@ -6,19 +6,27 @@
 
 constexpr double MY_PI = 3.1415926;
 
+/// @brief Get the view matrix
+/// @param eye_pos The position of the camera
+/// @return The view matrix
 Eigen::Matrix4f get_view_matrix(Eigen::Vector3f eye_pos)
 {
     Eigen::Matrix4f view = Eigen::Matrix4f::Identity();
 
     Eigen::Matrix4f translate;
-    translate << 1, 0, 0, -eye_pos[0], 0, 1, 0, -eye_pos[1], 0, 0, 1,
-        -eye_pos[2], 0, 0, 0, 1;
+    translate << 1, 0, 0, -eye_pos[0],
+                 0, 1, 0, -eye_pos[1],
+                 0, 0, 1, -eye_pos[2],
+                 0, 0, 0, 1;
 
     view = translate * view;
 
     return view;
 }
 
+/// @brief Get the model matrix
+/// @param rotation_angle The angle of rotation
+/// @return The model matrix
 Eigen::Matrix4f get_model_matrix(float rotation_angle)
 {
     Eigen::Matrix4f model = Eigen::Matrix4f::Identity();
@@ -26,6 +34,15 @@ Eigen::Matrix4f get_model_matrix(float rotation_angle)
     // TODO: Implement this function
     // Create the model matrix for rotating the triangle around the Z axis.
     // Then return it.
+    Eigen::Matrix4f rotateZ;
+
+    float angle = rotation_angle / 180.0 * MY_PI;
+
+    rotateZ << cos(angle), -sin(angle), 0, 0,
+               sin(angle), cos(angle), 0, 0,
+               0, 0, 1, 0,
+               0, 0, 0, 1;
+    model = rotateZ * model;
 
     return model;
 }
@@ -40,14 +57,41 @@ Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio,
     // TODO: Implement this function
     // Create the projection matrix for the given parameters.
     // Then return it.
+    float top = zNear * tan(eye_fov / 2);
+    float right = top * aspect_ratio;
+    float left = -right;
+    float bottom = -top;
+    float near = -zNear;
+    float far = -zFar;
 
+    Eigen::Matrix4f ortho;
+    Eigen::Matrix4f orthoTranslate;
+    Eigen::Matrix4f persp2ortho;
+
+    ortho << 2 / (right - left), 0, 0, 0,
+             0, 2 / (top - bottom), 0, 0,
+             0, 0, 2 / (near - far), 0,
+             0, 0, 0, 1;
+
+    orthoTranslate << 1, 0, 0, -(right + left) / 2,
+                      0, 1, 0, -(top + bottom) / 2,
+                      0, 0, 1, -(near + far) / 2,
+                      0, 0, 0, 1;
+
+    ortho = ortho * orthoTranslate;
+
+    persp2ortho << near, 0, 0, 0,
+                    0, near, 0, 0,
+                    0, 0, near + far, -near * far,
+                    0, 0, 1, 0;
+
+    projection = ortho * persp2ortho * projection;
+    
     return projection;
 }
 
 int main(int argc, const char** argv)
 {
-    std::cout << "Start Assignment 1" << std::endl;
-
     float angle = 0;
     bool command_line = false;
     std::string filename = "output.png";
