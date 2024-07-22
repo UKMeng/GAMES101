@@ -93,11 +93,18 @@ namespace rst
         std::vector<Eigen::Vector3f> frame_buf;
 
         std::vector<float> depth_buf;
+
+        std::vector<std::vector<float>> depth_buf_ssaa;
+        std::vector<std::vector<Eigen::Vector3f>> sampleSSAA;
+
+
         int get_index(int x, int y);
 
         int width, height;
 
         int next_id = 0;
         int get_next_id() { return next_id++; }
+
+        bool SSAA = true;
     };
 }

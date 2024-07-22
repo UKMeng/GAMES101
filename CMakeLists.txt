@@ -12,5 +12,5 @@ include_directories(/usr/local/include)
 include_directories(3rdParty)
 include_directories(${OpenCV_INCLUDE_DIRS})
 
-add_subdirectory(Assignment1)
+add_subdirectory(Assignment2)
 

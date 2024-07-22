@@ -31,7 +31,46 @@ Eigen::Matrix4f get_model_matrix(float rotation_angle)
 Eigen::Matrix4f get_projection_matrix(float eye_fov, float aspect_ratio, float zNear, float zFar)
 {
     // TODO: Copy-paste your implementation from the previous assignment.
-    Eigen::Matrix4f projection;
+    Eigen::Matrix4f projection = Eigen::Matrix4f::Identity();
+
+    float top = zNear * tan(eye_fov / 2);
+    float right = top * aspect_ratio;
+    float left = -right;
+    float bottom = -top;
+    float near = zNear;
+    float far = zFar;
+
+    Eigen::Matrix4f ortho;
+    Eigen::Matrix4f orthoTranslate;
+    Eigen::Matrix4f persp2ortho;
+
+    ortho << 2 / (right - left), 0, 0, 0,
+            0, 2 / (top - bottom), 0, 0,
+            0, 0, 2 / (far - near), 0,
+            0, 0, 0, 1;
+
+    orthoTranslate << 1, 0, 0, -(right + left) / 2,
+            0, 1, 0, -(top + bottom) / 2,
+            0, 0, 1, -(near + far) / 2,
+            0, 0, 0, 1;
+
+    ortho = ortho * orthoTranslate;
+
+    persp2ortho << near, 0, 0, 0,
+                    0, near, 0, 0,
+                    0, 0, near + far, -near * far,
+                    0, 0, 1, 0;
+
+    // reverse z coordinate
+    // reference：http://games-cn.org/forums/topic/%e4%bd%9c%e4%b8%9a%e4%b8%89%e7%9a%84%e7%89%9b%e5%80%92%e8%bf%87%e6%9d%a5%e4%ba%86/
+    Eigen::Matrix4f mt(4,4);
+    mt << 1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, -1, 0,
+        0, 0, 0, 1;
+
+
+    projection = ortho * persp2ortho * mt * projection ;
 
     return projection;
 }

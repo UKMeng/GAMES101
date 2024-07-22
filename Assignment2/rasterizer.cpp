@@ -1,4 +1,4 @@
-// clang-format off
+﻿// clang-format off
 //
 // Created by goksu on 4/6/19.
 //
@@ -40,9 +40,16 @@ auto to_vec4(const Eigen::Vector3f& v3, float w = 1.0f)
 }
 
 
-static bool insideTriangle(int x, int y, const Vector3f* _v)
+static bool insideTriangle(float px, float py, const Vector3f* _v)
 {   
     // TODO : Implement this function to check if the point (x, y) is inside the triangle represented by _v[0], _v[1], _v[2]
+    // center of the pixel
+
+    float r1 = (_v[0].x() - _v[1].x()) * (_v[0].y() - py) - (_v[0].x() - px) * (_v[0].y() - _v[1].y());
+    float r2 = (_v[1].x() - _v[2].x()) * (_v[1].y() - py) - (_v[1].x() - px) * (_v[1].y() - _v[2].y());
+    float r3 = (_v[2].x() - _v[0].x()) * (_v[2].y() - py) - (_v[2].x() - px) * (_v[2].y() - _v[0].y());
+
+    return (r1 >= 0 && r2 >= 0 && r3 >= 0) || (r1 <= 0 && r2 <= 0 && r3 <= 0);
 }
 
 static std::tuple<float, float, float> computeBarycentric2D(float x, float y, const Vector3f* v)
@@ -103,19 +110,75 @@ void rst::rasterizer::draw(pos_buf_id pos_buffer, ind_buf_id ind_buffer, col_buf
 }
 
 //Screen space rasterization
-void rst::rasterizer::rasterize_triangle(const Triangle& t) {
+void rst::rasterizer::rasterize_triangle(const Triangle& t)
+{
     auto v = t.toVector4();
-    
+
     // TODO : Find out the bounding box of current triangle.
+    // the bounding box
+    int xMin = int(std::min(std::min(v[0].x(), v[1].x()), v[2].x()));
+    int xMax = int(std::max(std::max(v[0].x(), v[1].x()), v[2].x())) + 1;
+    int yMin = int(std::min(std::min(v[0].y(), v[1].y()), v[2].y()));
+    int yMax = int(std::max(std::max(v[0].y(), v[1].y()), v[2].y())) + 1;
+
+    Vector3f color = t.getColor();
+
     // iterate through the pixel and find if the current pixel is inside the triangle
+    for (int x = xMin; x < xMax; ++x)
+    {
+        for (int y = yMin; y < yMax; ++y)
+        {
+            if (SSAA)
+            {
+                int index = get_index(x, y);
+                int samplesCount = 0;
+                std::vector<std::pair<float, float>> sampleCoords = {{0.25f, 0.25f}, {0.75f, 0.25f}, {0.25f, 0.75f}, {0.75f, 0.75f} };
+                for (int i = 0; i < 4; ++i)
+                {
+                    auto& [dx, dy] = sampleCoords[i];
+                    if (insideTriangle(x + dx, y + dy, t.v))
+                    {
+                        samplesCount++;
 
-    // If so, use the following code to get the interpolated z value.
-    //auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
-    //float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
-    //float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
-    //z_interpolated *= w_reciprocal;
+                        auto[alpha, beta, gamma] = computeBarycentric2D(x + dx, y + dy, t.v);
+                        float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                        float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                        z_interpolated *= w_reciprocal;
 
-    // TODO : set the current pixel (use the set_pixel function) to the color of the triangle (use getColor function) if it should be painted.
+                        if (z_interpolated < depth_buf_ssaa[index][i]) {
+                            depth_buf_ssaa[index][i] = z_interpolated;
+                            sampleSSAA[index][i] = color / 4.0f;
+                        }
+                    }
+                }
+                if (samplesCount)
+                {
+                    Vector3f pixelColor = {0.f, 0.f, 0.f};
+                    for (int j = 0; j < 4; j++) pixelColor += sampleSSAA[index][j];
+                    set_pixel(Vector3f(x, y, 1.0f), pixelColor);
+                }
+            }
+            else
+            {
+                if (insideTriangle(x + 0.5f, y + 0.5f, t.v))
+                {
+                    // If so, use the following code to get the interpolated z value.
+                    auto[alpha, beta, gamma] = computeBarycentric2D(x, y, t.v);
+                    float w_reciprocal = 1.0/(alpha / v[0].w() + beta / v[1].w() + gamma / v[2].w());
+                    float z_interpolated = alpha * v[0].z() / v[0].w() + beta * v[1].z() / v[1].w() + gamma * v[2].z() / v[2].w();
+                    z_interpolated *= w_reciprocal;
+
+                    // depth test
+                    int index = get_index(x, y);
+                    if (z_interpolated < depth_buf[index])
+                    {
+                        depth_buf[index] = z_interpolated;
+                        set_pixel(Vector3f(x, y, 1.0f), color);
+                    }
+                }
+            }
+        }
+    }
 }
 
 void rst::rasterizer::set_model(const Eigen::Matrix4f& m)
@@ -141,14 +204,23 @@ void rst::rasterizer::clear(rst::Buffers buff)
     }
     if ((buff & rst::Buffers::Depth) == rst::Buffers::Depth)
     {
-        std::fill(depth_buf.begin(), depth_buf.end(), std::numeric_limits<float>::infinity());
+        if (SSAA) {
+            std::fill(sampleSSAA.begin(), sampleSSAA.end(), std::vector<Eigen::Vector3f>(4, Eigen::Vector3f{0, 0, 0}));
+            std::fill(depth_buf_ssaa.begin(), depth_buf_ssaa.end(), std::vector<float>(4, std::numeric_limits<float>::infinity()));
+        }
+        else std::fill(depth_buf.begin(), depth_buf.end(), std::numeric_limits<float>::infinity());
     }
 }
 
 rst::rasterizer::rasterizer(int w, int h) : width(w), height(h)
 {
     frame_buf.resize(w * h);
-    depth_buf.resize(w * h);
+    if(SSAA)
+    {
+        depth_buf_ssaa.resize(w * h);
+        sampleSSAA.resize(w * h);
+    }
+    else depth_buf.resize(w * h);
 }
 
 int rst::rasterizer::get_index(int x, int y)
