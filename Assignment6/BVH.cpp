@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include "BVH.hpp"
 
 BVHAccel::BVHAccel(std::vector<Object*> p, int maxPrimsInNode,
@@ -7,22 +8,24 @@ BVHAccel::BVHAccel(std::vector<Object*> p, int maxPrimsInNode,
     : maxPrimsInNode(std::min(255, maxPrimsInNode)), splitMethod(splitMethod),
       primitives(std::move(p))
 {
-    time_t start, stop;
-    time(&start);
+    auto start = std::chrono::system_clock::now();
     if (primitives.empty())
         return;
 
     root = recursiveBuild(primitives);
+    auto stop = std::chrono::system_clock::now();
 
-    time(&stop);
-    double diff = difftime(stop, start);
-    int hrs = (int)diff / 3600;
-    int mins = ((int)diff / 60) - (hrs * 60);
-    int secs = (int)diff - (hrs * 3600) - (mins * 60);
+    std::cout << "BVH Generation complete.\n";
+    std::cout << "Time taken: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop - start).count() << " milliseconds\n";
 
-    printf(
-        "\rBVH Generation complete: \nTime Taken: %i hrs, %i mins, %i secs\n\n",
-        hrs, mins, secs);
+//    double diff = difftime(stop, start);
+//    int hrs = (int)diff / 3600;
+//    int mins = ((int)diff / 60) - (hrs * 60);
+//    int secs = (int)diff - (hrs * 3600) - (mins * 60);
+//
+//    printf(
+//        "\rBVH Generation complete: \nTime Taken: %i hrs, %i mins, %i secs\n\n",
+//        hrs, mins, secs);
 }
 
 BVHBuildNode* BVHAccel::recursiveBuild(std::vector<Object*> objects)
@@ -105,5 +108,24 @@ Intersection BVHAccel::Intersect(const Ray& ray) const
 Intersection BVHAccel::getIntersection(BVHBuildNode* node, const Ray& ray) const
 {
     // TODO Traverse the BVH to find intersection
+    Intersection isect;
+    if (node == nullptr) return isect;
 
+
+    if (!node->bounds.IntersectP(ray, ray.direction_inv, {ray.direction.x > 0, ray.direction.y > 0, ray.direction.z > 0}))
+    {
+        return isect;
+    }
+    if (!node->left && !node->right) {
+        isect = node->object->getIntersection(ray);
+        return isect;
+    }
+    else {
+        Intersection leftIsect = getIntersection(node->left, ray);
+        Intersection rightIsect = getIntersection(node->right, ray);
+        if (leftIsect.distance < rightIsect.distance)
+            return leftIsect;
+        else
+            return rightIsect;
+    }
 }
