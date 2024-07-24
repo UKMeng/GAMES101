@@ -13,5 +13,5 @@ include_directories(3rdParty)
 include_directories(${OpenCV_INCLUDE_DIRS})
 include_directories(${EIGEN3_INCLUDE_DIR})
 
-add_subdirectory(Assignment4)
+add_subdirectory(Assignment5)
 
