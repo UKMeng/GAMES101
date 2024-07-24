@@ -11,7 +11,20 @@ bool rayTriangleIntersect(const Vector3f& v0, const Vector3f& v1, const Vector3f
     // that's specified bt v0, v1 and v2 intersects with the ray (whose
     // origin is *orig* and direction is *dir*)
     // Also don't forget to update tnear, u and v.
-    return false;
+    // Moller-Trumbore algorithm
+    auto E1 = v1 - v0;
+    auto E2 = v2 - v0;
+    auto S = orig - v0;
+    auto S1 = crossProduct(dir, E2);
+    auto S2 = crossProduct(S, E1);
+
+    float denom = dotProduct(S1, E1);
+
+    tnear = dotProduct(S2, E2) / denom;
+    u = dotProduct(S1, S) / denom;
+    v = dotProduct(S2, dir) / denom;
+
+    return (tnear >= 0.0f && u >= 0.0f && v >= 0.0f && u + v <= 1.0f);
 }
 
 class MeshTriangle : public Object
