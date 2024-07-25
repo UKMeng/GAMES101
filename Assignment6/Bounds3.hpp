@@ -74,7 +74,7 @@ class Bounds3
         return (x && y && z);
     }
 
-    bool Inside(const Vector3f& p, const Bounds3& b)
+    static bool Inside(const Vector3f& p, const Bounds3& b)
     {
         return (p.x >= b.pMin.x && p.x <= b.pMax.x && p.y >= b.pMin.y &&
                 p.y <= b.pMax.y && p.z >= b.pMin.z && p.z <= b.pMax.z);
