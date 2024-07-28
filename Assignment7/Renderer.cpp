@@ -40,7 +40,7 @@ void Renderer::Render(const Scene& scene)
     int m = 0;
 
     // change the spp value to change sample ammount
-    int spp = 32;
+    int spp = 512;
     std::cout << "SPP: " << spp << "\n";
 
     int threadsNum = 1024;

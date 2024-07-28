@@ -7,7 +7,7 @@
 
 #include "Vector.hpp"
 
-enum MaterialType { DIFFUSE};
+enum MaterialType { DIFFUSE, MICROFACET };
 
 class Material{
 private:
@@ -85,11 +85,44 @@ private:
         return a.x * B + a.y * C + a.z * N;
     }
 
+    float NDF_GGX(const Vector3f &N, const Vector3f &H, const float &alpha) const
+    {
+        float a2 = alpha * alpha;
+        float NdotH = std::max(0.0f, dotProduct(N, H));
+        float NdotH2 = NdotH * NdotH;
+
+        float nom = a2;
+        float denom = (NdotH2 * (a2 - 1.0f) + 1.0f);
+        denom = M_PI * denom * denom;
+
+        return nom / denom;
+    }
+
+    float GeometrySchlickGGX(float NdotV, const float &alpha) const
+    {
+        float r = (alpha + 1.0);
+        float k = (r * r) / 8.0;
+        float num = NdotV;
+        float denom = NdotV * (1.0 - k) + k;
+        return num / denom;
+    }
+
+    float GeometrySmith(const Vector3f &N, const Vector3f &V, const Vector3f &L, const float &alpha) const
+    {
+        float NdotV = std::max(0.0f, dotProduct(N, V));
+        float NdotL = std::max(0.0f, dotProduct(N, L));
+        float ggx2 = GeometrySchlickGGX(NdotV, alpha);
+        float ggx1 = GeometrySchlickGGX(NdotL, alpha);
+
+        return ggx1 * ggx2;
+    }
+
 public:
     MaterialType m_type;
     //Vector3f m_color;
     Vector3f m_emission;
     float ior;
+    float roughness;
     Vector3f Kd, Ks;
     float specularExponent;
     //Texture tex;
@@ -132,6 +165,7 @@ Vector3f Material::getColorAt(double u, double v) {
 Vector3f Material::sample(const Vector3f &wi, const Vector3f &N){
     switch(m_type){
         case DIFFUSE:
+        case MICROFACET:
         {
             // uniform sample on the hemisphere
             float x_1 = get_random_float(), x_2 = get_random_float();
@@ -148,6 +182,7 @@ Vector3f Material::sample(const Vector3f &wi, const Vector3f &N){
 float Material::pdf(const Vector3f &wi, const Vector3f &wo, const Vector3f &N){
     switch(m_type){
         case DIFFUSE:
+        case MICROFACET:
         {
             // uniform sample probability 1 / (2 * PI)
             if (dotProduct(wo, N) > 0.0f)
@@ -168,6 +203,31 @@ Vector3f Material::eval(const Vector3f &wi, const Vector3f &wo, const Vector3f &
             if (cosalpha > 0.0f) {
                 Vector3f diffuse = Kd / M_PI;
                 return diffuse;
+            }
+            else
+                return Vector3f(0.0f);
+            break;
+        }
+        case MICROFACET:
+        {
+            // fresnel term
+            float cosalpha = dotProduct(N, wo);
+            if (cosalpha > 0.0f)
+            {
+                float kr;
+                fresnel(wi, N, ior, kr);
+
+                // lambertian diffuse model
+                Vector3f diffuse = (1 - kr) * Kd / M_PI;;
+
+                // specular
+                Vector3f halfVector = (wo - wi).normalized();
+                float denom = 4 * std::max(0.0f, dotProduct(N, -wi)) * std::max(0.0f, dotProduct(N, wo)) + 0.0001f;
+                float dNormal = NDF_GGX(N, halfVector, roughness);
+                float G = GeometrySmith(N, -wi, wo, roughness);
+                Vector3f specular = dNormal * G * kr / denom;
+
+                return diffuse + specular;
             }
             else
                 return Vector3f(0.0f);

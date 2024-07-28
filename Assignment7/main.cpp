@@ -25,15 +25,22 @@ int main(int argc, char** argv)
     Material* light = new Material(DIFFUSE, (8.0f * Vector3f(0.747f+0.058f, 0.747f+0.258f, 0.747f) + 15.6f * Vector3f(0.740f+0.287f,0.740f+0.160f,0.740f) + 18.4f *Vector3f(0.737f+0.642f,0.737f+0.159f,0.737f)));
     light->Kd = Vector3f(0.65f);
 
+    Material* metallic = new Material(MICROFACET, Vector3f(0.0f));
+    metallic->ior = 2.43f;
+    metallic->Kd = Vector3f(1.00, 0.86, 0.57);
+    metallic->roughness = 0.2f;
+
     MeshTriangle floor("../models/cornellbox/floor.obj", white);
-    MeshTriangle shortbox("../models/cornellbox/shortbox.obj", white);
+    // MeshTriangle shortbox("../models/cornellbox/shortbox.obj", metallic);
+    Sphere sphere(Vector3f(175, 100, 150), 100, metallic);
     MeshTriangle tallbox("../models/cornellbox/tallbox.obj", white);
     MeshTriangle left("../models/cornellbox/left.obj", red);
     MeshTriangle right("../models/cornellbox/right.obj", green);
     MeshTriangle light_("../models/cornellbox/light.obj", light);
 
     scene.Add(&floor);
-    scene.Add(&shortbox);
+    scene.Add(&sphere);
+    //scene.Add(&shortbox);
     scene.Add(&tallbox);
     scene.Add(&left);
     scene.Add(&right);
